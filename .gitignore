@@ -1,3 +1,7 @@
+# Repo-specified
+resources/cached/cover/*
+tmp/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
