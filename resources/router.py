@@ -95,7 +95,6 @@ class Router(object):
             },
             'is_playable':True,
          })
-      # xbmc.executebuiltin('Container.SetViewMode(512)') # Вид "Инфо-стена"
       res=self.plugin.add_to_playlist(res, playlist='video')
       return res
 

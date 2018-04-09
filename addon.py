@@ -7,8 +7,6 @@ from resources.lib.functionsex import *
 from resources.lib.logger import RemoteLogger
 from resources.router import Router
 
-# Plugin().notify('Test msg here', delay=10000)
-
 _ADDON_NAME='plugin.video.FoxFanFun'
 _addon=xbmcaddon.Addon(id=_ADDON_NAME)
 try: _addon_id=int(sys.argv[1])

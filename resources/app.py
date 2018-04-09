@@ -10,7 +10,7 @@ try:
 except ImportError:
    from StringIO import StringIO
 
-__VERSION__=0.34
+__VERSION__=0.35
 
 REMOTE_LOG=None
 REMOTE_LOG='192.168.2.33:21001'
@@ -33,8 +33,10 @@ class FoxFanFun(object):
       self.path=MagicDict({
          'tmp':os.path.join(addonPath, 'resources', 'tmp')+'/',
          # special://thumbnails
+         'image':os.path.join(addonPath, 'resources', 'img')+'/',
          'cover':os.path.join(addonPath, 'resources', 'cached', 'cover')+'/',
       })
+      logger._cb=lambda t, s: self.notify(s, t)
       mytime=getms(True)
       self.data=self.plugin.get_storage('data')
       self.special=self.plugin.get_storage('special')
@@ -70,6 +72,19 @@ class FoxFanFun(object):
       self.special['dbVersion']=self.version.db
       self.data.sync()
       self.special.sync()
+
+   def notify(msg, errorOrType=None):
+      if errorOrType is True: errorOrType='err'
+      if isString(errorOrType):
+         errorOrType=errorOrType.lower()
+      typeMap={
+         'err':('', '', 'icon_error.png', 10000),
+         'warn':('', '', 'icon_warn.png', 10000),
+         'ok':('', '', 'icon_ok.png', 3000),
+      }
+      o=typeMap.get(errorOrType, typeMap['ok'])
+      s='%s Fox-Fan-Fun %s'%(o[0], o[1])
+      self.plugin.notify(msg, title=s, image=(self.path.image+o[2] if o[2] else None), delay=o[3])
 
    def ua(self):
       return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'
@@ -131,13 +146,13 @@ class FoxFanFun(object):
       return res
 
    def _loadImage(self, url, path, allowCompression=True):
-      #? можно еще сделать ttl на основе time-modified через os.path.getmtime()
+      # ? можно еще сделать ttl на основе time-modified через os.path.getmtime()
       if os.path.isfile(path): return True
       logger.log('Downloading new image', url)
       try:
          r=requests.get(url, allow_redirects=True, headers={'User-Agent':self.ua()}, cookies=self.cookie())
          if IMAGE_COMPRESSION_ENABLED and allowCompression:
-            logger.log('Compressing new image', url)
+            # logger.log('Compressing new image', url)
             img=Image.open(StringIO(r.content))
             img.save(path, "JPEG", quality=(allowCompression if isInt(allowCompression) else 70))
          else:
@@ -524,7 +539,7 @@ class FoxFanFun(object):
          return False
       return self._listEpisode_list(showId, seasonId, tArr1)
 
-   def watch(self, showId, seasonId, episodeId):
+   def watch(self, showId, seasonId, episodeId, voiceId=None):
       if showId not in self.data:
          logger.err('Unknown showId', showId)
          return MagicDict({})
@@ -534,11 +549,33 @@ class FoxFanFun(object):
       if episodeId not in self.data[showId].data[seasonId].data:
          logger.err('Unknown episodeId', showId, seasonId, episodeId)
          return MagicDict({})
-      #! here we need to implement voice selecting
       url=self.data[showId].data[seasonId].data[episodeId].url
+      if voiceId:
+         voiceId=strEx(voiceId)
+         url=rebuildURL(url, {'query':{'voice':voiceId}})
       data=self.load(url)
-      # html=self._parseHtml(url, data)
-      #! checking voice here
+      html=self._parseHtml(url, data)
+      # extracting voice-tracks
+      voiceMap={}
+      voiceNow=None
+      try:
+         tArr1=html.getOne('#centerSeries').getOne('#voice').getOne('ul').get('li')
+         for o in tArr1:
+            isNow='voiceOn' in o.classes
+            for oo in o.get('a'):
+               try:
+                  vId=parse_qs(urlparse(oo.attr['href']).query)['voice'][0]
+                  vName=oo.content
+                  if o.id=='captionsrusAll': vName=u'Субтитры '+vName
+                  voiceMap[vId]=vName
+                  if isNow: voiceNow=vId
+               except Exception:
+                  logger.warn('Cant parce voice-track\n', url, oo.source)
+      except Exception:
+         logger.err('Cant extract voice-tracks', url, getErrorInfo())
+      if voiceId and voiceId!=voiceNow:
+         logger.err('Cant find selected voice track', voiceId, voiceNow, url)
+      # extracting video link
       if 'new Playerjs({' not in data:
          logger.err('Url for video not founded', showId, seasonId, episodeId)
          fileWrite(self.path.tmp+'%s__%s%s.html'%(showId, seasonId, episodeId), strUniDecode(data))
@@ -551,8 +588,11 @@ class FoxFanFun(object):
          'Referer':url,
       })
       # fileWrite(self.path.tmp+'%s__%s%s.txt'%(showId, seasonId, episodeId), strUniDecode(fileUrl))
+      self.data[showId].data[seasonId].data[episodeId].voiceMap=voiceMap
       res=MagicDict(dict(self.data[showId].data[seasonId].data[episodeId]))
       res.file=fileUrl
+      res.voiceNow=voiceNow
+      # print_r(res)
       # updating watch-counters
       self.data[showId].watched+=1
       self.data[showId].lastWatched=getms(False)
