@@ -100,7 +100,7 @@ class FoxFanFun(object):
          headers={'User-Agent':self.ua()},
          cookies=None if noCookie else self.cookie(),
          data=data,
-         proxie=None, timeout=15,
+         proxie=None, timeout=30,
          returnOnlyData=False, tryForceEncoding=False, forceEncoding=False,
          silent=True, raiseErrors=True)
       if r.cookies and self.temp.get('cookie')!=r.cookies:
@@ -592,7 +592,6 @@ class FoxFanFun(object):
       res=MagicDict(dict(self.data[showId].data[seasonId].data[episodeId]))
       res.file=fileUrl
       res.voiceNow=voiceNow
-      # print_r(res)
       # updating watch-counters
       self.data[showId].watched+=1
       self.data[showId].lastWatched=getms(False)
