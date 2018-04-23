@@ -5,6 +5,9 @@ class RemoteLogger(object):
    def __init__(self, addr, app=None, cb=None):
       self.app=app or ''
       self.enabled=False
+      self._cb=None
+      self.addr=''
+      self._addr=''
       if not addr: return
       try:
          s=getHtml2('http://%s/ping'%addr, silent=True, raiseErrors=True)
